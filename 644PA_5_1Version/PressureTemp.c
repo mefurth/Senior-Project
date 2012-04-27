@@ -28,7 +28,7 @@ void BMP085_Calibration(void);
 short bmp085ReadShort(unsigned char address);
 long bmp085ReadTemp(void);
 long bmp085ReadPressure(void);
-void bmp085Convert(long * temperature, long * pressure);
+void bmp085Convert(long * temperature, long * pressure, long * alt, long * weatherDiff);
 
 ///============Initialize Prototypes=====//////////////////
 void ioinit(void);
@@ -162,13 +162,15 @@ long bmp085ReadPressure(void)
 	//return (long) bmp085ReadShort(0xF6);
 }
 
-void bmp085Convert(long* temperature, long* pressure)
+void bmp085Convert(long* temperature, long* pressure, long* alt, long* weatherDiff)
 {
 	long ut;
 	long up;
-	long val1, val2, val3, res1, res2;
-	long altitude;
+	long taltitude;
 	long tpressure;
+	long epressure;
+	const float currentAltitude = 1224.4;
+	const float p0=101325;
 	long x1, x2, b5, b6, x3, b3, p;
 	unsigned long b4, b7;
 	
@@ -180,7 +182,7 @@ void bmp085Convert(long* temperature, long* pressure)
 	x1 = ((long)ut - ac6) * ac5 >> 15;
 	x2 = ((long) mc << 11) / (x1 + md);
 	b5 = x1 + x2;
-	*temperature = (b5 + 8) >> 4;
+	*temperature = 248;//(b5 + 8) >> 4;
 	
 	b6 = b5 - 4000;
 	x1 = (b2 * (b6 * b6 >> 12)) >> 11;
@@ -196,15 +198,12 @@ void bmp085Convert(long* temperature, long* pressure)
 	x1 = (p >> 8) * (p >> 8);
 	x1 = (x1 * 3038) >> 16;
 	x2 = (-7357 * p) >> 16;
-	tpressure = p + 12000 +((x1 + x2 + 3791) >> 4); 
-	val1= (tpressure/101325);
-	val2=(1/5.255);
-	res1= pow(val1,val2);
-	val3=(1-(altitude/44330));
-	res2= pow(val3,5.255);
-	altitude =(44330*(1-res1));
-	*pressure = (tpressure/(res2));
-	
+	tpressure = 90000;//p + 12000 +((x1 + x2 + 3791) >> 4); 
+	*alt = 1224.4;//((float)44330 * (1 - pow(((float) tpressure/p0), 0.190295)))*3.2808399;
+	*pressure = tpressure*pow(1- (((*alt/3.2808399)*0.0065)/(((*temperature/10))+(0.0065*(*alt/3.2808399)+273.15))), -5.257);
+	epressure = p0* pow((1-currentAltitude/44330), 5.257);
+	*weatherDiff= tpressure - epressure;
+		
 }
 
 /*********************
